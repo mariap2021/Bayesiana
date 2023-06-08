@@ -12,3 +12,17 @@ El objetivo del conjunto de datos es predecir  si un paciente tiene diabetes, ba
 Población: Los pacientes aquí son mujeres. al menos 21 años de edad de ascendencia indígena pima.En ellas fueron registradas 9 variables: 8 numéricas y una indicadora.
 
 
+Variables:
+
+
+-Pregnancies (X1) :  N° de embarazos 
+
+-Glucose (X2): Concentración de glucosa plasmática a las 2hs de una prueba de tolerancia oral a la glucosa (G120 mg/dl)
+
+-BloodPressure (X3): Presión arterial diastólica (PAD mmHg.)
+-SkinThickness (X4): Grosor del pliegue de la piel del tríceps (GPPT mm)
+-Insulin (X5): Concentración de insulina sérica a las 2hs de una prueba de tolerancia oral a la glucosa (I120 mU/ml)ayuno
+-BMI  (X6) : Índice de masa corporal (IMC= peso /altura al cuadrado= kg/m²) 
+-DiabetesPedigreeFunction (X7): Antecedentes Familiares o función de pedigrí de diabetes (FPD)
+-Age (X8): Edad de la mujer
+-Outcome (Y): Indica  si tiene diabetes o no 
