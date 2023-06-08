@@ -1,0 +1,468 @@
+---
+title: "ar"
+author: "bay"
+date: "2023-06-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r, warning=FALSE, message=FALSE}
+# Loading libraries:
+library(dplyr)
+library(knitr)
+library(kableExtra)
+library(ggplot2)
+library(mice)
+library(miceRanger)
+library(rstan)
+library(HDInterval)
+library(loo)
+library(readr)
+library(ROCR)
+```
+
+# Datos
+
+```{r}
+diabetes <- read_csv("pilar.csv")
+
+n<-100
+
+set.seed(123)
+muestramia<- sample(1:nrow(diabetes),size=n,replace=FALSE)
+muestramia
+
+test=diabetes[muestramia,] # base de prueba con la base original
+
+train=diabetes[-muestramia,] # base de entrenamiento con la base original
+
+```
+
+
+# Modelo1 con la base de train completa original con todas las variables
+
+
+```{r}
+
+X <- model.matrix(~ . , data = train[,-9])
+
+y <- as.numeric(train$Outcome)
+
+stan_data <- list(
+  "X" = X,
+  "y" = y,
+  "N" = nrow(train), # Numero de observaciones
+  "p" = ncol(X) # numero de varaibles
+)
+
+fit <- stan(file =  "ModeloLogistico.stan", data = stan_data, chains = 3, seed = 1 )
+
+
+
+print(fit)
+
+Beta.poste <- extract(fit, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+#Intervalos HDI para Beta_i
+dev.new()
+png(filename = "modelo_con_cero_train.png", width = 1500, height = 1500)
+par(mfrow=c(dim(Beta.poste)[2],2))
+for(i in 1:dim(Beta.poste)[2]){
+  #Inicio
+  HDI.interval.beta <- hdi(Beta.poste[,i])
+  value1 <- HDI.interval.beta[1]
+  value2 <- HDI.interval.beta[2]
+  DENSITITY.BETA <- density(Beta.poste[,i])
+  plot(DENSITITY.BETA, main = "Densidad Posterior", xlab = parse(text=(paste0("beta[",i,"]"))))
+  DENSITITY.BETAy <- DENSITITY.BETA$y
+  DENSITITY.BETAx <- DENSITITY.BETA$x
+  # Lower and higher indices on the X-axis
+  l <- min(which(DENSITITY.BETAx >= value1))
+  h <- max(which(DENSITITY.BETAx < value2))
+  
+  polygon(c(DENSITITY.BETAx[c(l, l:h, h)]),
+          c(0, DENSITITY.BETAy[l:h], 0),
+          col = "slateblue1")
+  #Fin
+}
+
+dev.off()
+
+
+
+#traceplot
+
+
+traceplot(fit)
+
+
+```
+
+# Modelo2 con train sólo con las variables significativas, x1, x2, x5(con duda),se van x3,x4,x8
+
+
+```{r}
+X2 <- model.matrix(~ . , data = train[,-c(3,4,8,9)])
+
+y2 <- as.numeric(train$Outcome)
+
+stan_data2 <- list(
+  "X" = X2,
+  "y" = y2,
+  "N" = nrow(train), # Numero de observaciones
+  "p" = ncol(X2) # numero de varaibles
+)
+
+fit2 <- stan(file =  "ModeloLogistico.stan", data = stan_data2, chains = 3, seed = 1)
+
+print(fit2)
+
+
+Beta.poste <- extract(fit2, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+#Intervalos HDI para Beta_i
+dev.new()
+png(filename = "modelo_con_cero_train_reducido.png", width = 1500, height = 1500)
+par(mfrow=c(dim(Beta.poste)[2],2))
+for(i in 1:dim(Beta.poste)[2]){
+  #Inicio
+  HDI.interval.beta <- hdi(Beta.poste[,i])
+  value1 <- HDI.interval.beta[1]
+  value2 <- HDI.interval.beta[2]
+  DENSITITY.BETA <- density(Beta.poste[,i])
+  plot(DENSITITY.BETA, main = "Densidad Posterior", xlab = parse(text=(paste0("beta[",i,"]"))))
+  DENSITITY.BETAy <- DENSITITY.BETA$y
+  DENSITITY.BETAx <- DENSITITY.BETA$x
+  # Lower and higher indices on the X-axis
+  l <- min(which(DENSITITY.BETAx >= value1))
+  h <- max(which(DENSITITY.BETAx < value2))
+  
+  polygon(c(DENSITITY.BETAx[c(l, l:h, h)]),
+          c(0, DENSITITY.BETAy[l:h], 0),
+          col = "slateblue1")
+  #Fin
+}
+
+dev.off()
+
+
+#traceplot
+
+
+traceplot(fit2)
+
+```
+
+# Quitando las variables que daban significativas si eliminabamos los ceros
+
+```{r}
+
+X3 <- model.matrix(~ . , data = train[,-c(4,5,8,9)])
+
+y3 <- as.numeric(train$Outcome)
+
+stan_data3 <- list(
+  "X" = X3,
+  "y" = y3,
+  "N" = nrow(train), # Numero de observaciones
+  "p" = ncol(X3) # numero de varaibles
+)
+
+fit3 <- stan(file =  "ModeloLogistico.stan", data = stan_data3, chains = 3, seed = 1)
+
+print(fit3)
+
+
+Beta.poste <- extract(fit3, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+#Intervalos HDI para Beta_i
+dev.new()
+png(filename = "modelo_con_cero_train_reducido_sig_elim_ceros.png", width = 1500, height = 1500)
+par(mfrow=c(dim(Beta.poste)[2],2))
+for(i in 1:dim(Beta.poste)[2]){
+  #Inicio
+  HDI.interval.beta <- hdi(Beta.poste[,i])
+  value1 <- HDI.interval.beta[1]
+  value2 <- HDI.interval.beta[2]
+  DENSITITY.BETA <- density(Beta.poste[,i])
+  plot(DENSITITY.BETA, main = "Densidad Posterior", xlab = parse(text=(paste0("beta[",i,"]"))))
+  DENSITITY.BETAy <- DENSITITY.BETA$y
+  DENSITITY.BETAx <- DENSITITY.BETA$x
+  # Lower and higher indices on the X-axis
+  l <- min(which(DENSITITY.BETAx >= value1))
+  h <- max(which(DENSITITY.BETAx < value2))
+  
+  polygon(c(DENSITITY.BETAx[c(l, l:h, h)]),
+          c(0, DENSITITY.BETAy[l:h], 0),
+          col = "slateblue1")
+  #Fin
+}
+
+dev.off()
+
+
+#traceplot
+
+
+traceplot(fit3)
+```
+
+
+
+# Verosimilitud para esos tres modelos
+
+```{r}
+##Comparacion empleando factores de Bayes
+#library(MASS)
+
+verosimilitud = function(Beta, X, y){  
+  res = ( (exp(X%*%Beta)/(1+exp(X%*%Beta)) )^y) * (( 1/(1+exp(X%*%Beta))  )^(1-y))
+  return(res)
+}
+
+#modelo 1
+X
+
+#modelos 2
+X2
+
+#modelo 3
+
+X3
+
+
+#posterior modelo 1
+Beta.simu.poste.M1 = extract(fit, "beta")
+Beta.simu.poste.M1 = Beta.simu.poste.M1[[1]]
+dim(Beta.simu.poste.M1)
+#posterior modelo 2
+Beta.simu.poste.M2 = extract(fit2, "beta")
+Beta.simu.poste.M2 = Beta.simu.poste.M2[[1]]
+dim(Beta.simu.poste.M2)
+ #posterior modelo 3
+Beta.simu.poste.M3 = extract(fit3, "beta")
+Beta.simu.poste.M3 = Beta.simu.poste.M3[[1]]
+dim(Beta.simu.poste.M3)
+#Verosimilitud marginal modelo 1
+vero.marginal1 = mean(sapply(1:dim(Beta.simu.poste.M1)[1], function(j) exp(sum(log(sapply(1:length(y), function(i){verosimilitud(Beta.simu.poste.M1[j,], X[i,], y[i])}))))))
+
+#Verosimilitud marginal modelo 2
+vero.marginal2 = mean(sapply(1:dim(Beta.simu.poste.M2)[1], function(j) exp(sum(log(sapply(1:length(y), function(i){verosimilitud(Beta.simu.poste.M2[j,], X2[i,], y[i])}))))))
+
+#Verosimilitud marginal modelo 3
+vero.marginal3 = mean(sapply(1:dim(Beta.simu.poste.M3)[1], function(j) exp(sum(log(sapply(1:length(y), function(i){verosimilitud(Beta.simu.poste.M3[j,], X3[i,], y[i])}))))))
+
+B12 = vero.marginal1/vero.marginal2
+
+B13 = vero.marginal1/vero.marginal3
+
+B23 = vero.marginal2/vero.marginal3
+
+Fbayes<-c(B12,B13,B23)
+Fbayes
+
+
+```
+
+# DIC
+
+```{r}
+
+```
+
+# PREDICCIONES CON CONJUNTO DE PRUEBA(TEST) PARA EL MODELO COMPLETO
+
+
+```{r}
+
+Beta.poste <- extract(fit, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+
+X01 <- model.matrix(~ . , data = test[,-9])
+y01 <- as.numeric(test$Outcome)
+
+p<- numeric()
+
+for (e in 1:100){
+  X0 <-  X01[e,]
+  py1 <- sapply(1:dim(Beta.poste)[1], 
+              function(i){
+                exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,]))
+                })
+  p[e]<-mean(py1)
+}
+
+ypred <- round(p,0)
+table(ypred, y01)
+
+
+#y.pred = sapply(1:dim(Beta.poste)[1], function(i){rbinom(1, 1, exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,])))})
+
+```
+
+
+```{r}
+
+Beta.poste <- extract(fit2, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+
+X01 <- model.matrix(~ . , data = test[,-c(3,4,8,9)])
+y01 <- as.numeric(test$Outcome)
+
+p1<- numeric()
+
+for (e in 1:100){
+  X0 <-  X01[e,]
+  py1 <- sapply(1:dim(Beta.poste)[1], 
+              function(i){
+                exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,]))
+                })
+  p1[e]<-mean(py1)
+
+  
+}
+
+ypred1 <- round(p1,0)
+table(ypred1, y01)
+
+
+#y.pred = sapply(1:dim(Beta.poste)[1], function(i){rbinom(1, 1, exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,])))})
+
+```
+
+
+
+```{r}
+
+Beta.poste <- extract(fit3, "beta")
+Beta.poste <- Beta.poste[[1]]
+dim(Beta.poste)
+
+
+X01 <- model.matrix(~ . , data = test[,-c(4,5,8,9)])
+y01 <- as.numeric(test$Outcome)
+
+p2<- numeric()
+
+for (e in 1:100){
+  X0 <-  X01[e,]
+  py1 <- sapply(1:dim(Beta.poste)[1], 
+              function(i){
+                exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,]))
+                })
+  p2[e]<-mean(py1)
+
+}
+
+ypred2 <- round(p2,0)
+table(ypred2, y01)
+
+a1=(52+17)/100
+a2=(52+19)/100
+a3=(53+20)/100
+#y.pred = sapply(1:dim(Beta.poste)[1], function(i){rbinom(1, 1, exp(X0%*%Beta.poste[i,])/ (1 + exp(X0%*%Beta.poste[i,])))})
+
+c(a1,a2,a3)
+```
+```{r}
+curva1=prediction(data.frame(p),test$Outcome)
+rl1=performance(curva1,measure="auc",x.measure ="cutoff")
+rl2=performance(curva1, "tpr","fpr")
+
+plot(rl2,colorize=T,main=paste("AUC:",(rl1@y.values)))
+```
+
+
+```{r}
+curva1=prediction(data.frame(p1),test$Outcome)
+rl1=performance(curva1,measure="auc",x.measure ="cutoff")
+rl2=performance(curva1, "tpr","fpr")
+
+plot(rl2,colorize=T,main=paste("AUC:",(rl1@y.values)))
+```
+
+
+```{r}
+curva1=prediction(data.frame(p2),test$Outcome)
+rl1=performance(curva1,measure="auc",x.measure ="cutoff")
+rl2=performance(curva1, "tpr","fpr")
+
+plot(rl2,colorize=T,main=paste("AUC:",(rl1@y.values)))
+```
+# DIC
+
+```{r}
+Beta.poste <- extract(fit, "beta")
+Beta.poste <- Beta.poste[[1]]
+neta <- X%*%colMeans(Beta.poste)
+logit <- function(x) {1/(1+exp(-x))}
+theta_bayes <- logit(neta)
+  
+log_fy <- sum(dbinom(x=train$Outcome,size = 1, prob = theta_bayes ,log=T))
+
+E_theta <-  sapply(1:dim(Beta.poste)[1], 
+              function(i){sum(dbinom(x = train$Outcome,
+                                 size = 1,
+                                 prob = logit(X%*%Beta.poste[i,]) ,
+                                 log=T))
+                })
+
+
+DIC = 2*log_fy-4*mean(E_theta)
+```
+
+```{r}
+Beta.poste <- extract(fit1, "beta")
+Beta.poste <- Beta.poste[[1]]
+neta <- X1%*%colMeans(Beta.poste)
+theta_bayes <- logit(neta)
+  
+log_fy <- sum(dbinom(x=train$Outcome,size = 1, prob = theta_bayes ,log=T))
+
+E_theta <-  sapply(1:dim(Beta.poste)[1], 
+              function(i){sum(dbinom(x = train$Outcome,
+                                 size = 1,
+                                 prob = logit(X1%*%Beta.poste[i,]) ,
+                                 log=T))
+                })
+
+
+DIC1 = 2*log_fy-4*mean(E_theta)
+```
+
+
+```{r}
+Beta.poste <- extract(fit2, "beta")
+Beta.poste <- Beta.poste[[1]]
+neta <- X2%*%colMeans(Beta.poste)
+theta_bayes <- logit(neta)
+  
+log_fy <- sum(dbinom(x=train$Outcome,size = 1, prob = theta_bayes ,log=T))
+
+E_theta <-  sapply(1:dim(Beta.poste)[1], 
+              function(i){sum(dbinom(x = train$Outcome,
+                                 size = 1,
+                                 prob = logit(X2%*%Beta.poste[i,]) ,
+                                 log=T))
+                })
+
+
+DIC2 = 2*log_fy-4*mean(E_theta)
+```
+
+
+
